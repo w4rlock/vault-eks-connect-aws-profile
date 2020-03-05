@@ -19,16 +19,13 @@ echo "Loading vaults accounts..."
 sleep 1
 profile=$(cat $_vault_cache_file \
   | jq -r ".data | .keys | .[]" \
-  | rg khatu- \
-  | fzf -1 -e --header="-- Vault accounts --" -q "${q}")
-
+  | fzf -1 -e --header="-- Vault accounts --" -q "${_fzf_default_filter}${q}")
 
 [ "${profile}" == "" ] && exit
 
 if grep -F "[${profile}]" $_creds_file &> /dev/null; then
   echo "Loading profile \"${profile}\" from cache..."
   eks-connect
-
 fi
 
 echo "Fetching vault profile \"${profile}\"..."
