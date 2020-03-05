@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -e
+source .env
+
+q=${@:-""}
+
+eks-connect() {
+  echo "Loading kubectl contexts..."
+  sleep 2
+
+  _ctx=$(kubectl config get-contexts -o name \
+    | fzf -1 -e --header="-- kubectl contexts --" -q "${q}")
+  [ "${_ctx}" != "" ] && kubectx $_ctx
+
+  exit 0
+}
+
+echo "Loading vaults accounts..."
+sleep 1
+profile=$(cat $_vault_cache_file \
+  | jq -r ".data | .keys | .[]" \
+  | rg khatu- \
+  | fzf -1 -e --header="-- Vault accounts --" -q "${q}")
+
+
+[ "${profile}" == "" ] && exit
+
+if grep -F "[${profile}]" $_creds_file &> /dev/null; then
+  echo "Loading profile \"${profile}\" from cache..."
+  eks-connect
+
+fi
+
+echo "Fetching vault profile \"${profile}\"..."
+_cred="${profile}.cred"
+
+./.vault-fetch.sh $profile > $_cred
+./.vault-json-to-aws-profile.sh "${profile}" "${_cred}"
+
+aws_profile=$(cat ${_cred} | jq -r ".data | .aws_profile")
+./.aws-profile-to-kube-config.sh $profile
+
+rm $_cred &> /dev/null
+
+eks-connect
